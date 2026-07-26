@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wireframe — a streaming speech API, from the protocol side</title>
+<meta name="description" content="A streaming ASR endpoint viewed from the wire: interim hypotheses resolving into finals, real VAD and endpointing on live audio, per-frame latency percentiles, and socket backpressure.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;550;650&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>">
+<style>
+  :root { --accent:#5fe3a1; --accent-dim:#1f8f5f; --accent-ink:#031a10; --bg:#0b1013; --panel:#141b1f; --panel-2:#1a2429; --line:#222e34; }
+  .caret { animation: blink 1s steps(2) infinite; color: var(--amber); }
+  @keyframes blink { 50% { opacity: 0 } }
+  #wire { max-height: 460px; overflow-y: auto; }
+  .controls { align-items: center; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand"><h1>Wireframe</h1><span class="tag">streaming ASR protocol</span></div>
+    <div class="top-spacer"></div>
+    <div class="clockline">model nova-3 · linear16 · 16 kHz · mono</div>
+  </div>
+</header>
+
+<div class="wrap">
+  <p class="lede">
+    Most speech demos show you a transcript. The interesting engineering is one layer down: the
+    socket. This is a streaming recognition endpoint viewed from the protocol side — interim
+    hypotheses arriving and being <em>revised</em> before anything is committed, endpointing deciding
+    where an utterance stopped, per-frame latency measured as percentiles rather than an average, and
+    a decode queue that applies backpressure when a client streams faster than realtime.
+    Switch it to live microphone and the VAD, adaptive noise floor and endpointer run on your actual audio.
+  </p>
+
+  <div class="metrics" id="metrics"></div>
+
+  <div class="panel">
+    <h2>Stream</h2>
+    <div class="controls" id="controls"></div>
+    <div class="pad note" id="micNote" style="padding-top:10px;padding-bottom:10px"></div>
+  </div>
+
+  <div class="cols" style="margin-top:18px">
+    <div>
+      <div class="panel">
+        <h2>Transcript <span class="h2spacer"></span><span class="count">interim vs final</span></h2>
+        <div class="pad" id="transcript"></div>
+        <div class="pad note" style="border-top:1px solid var(--line)">
+          Word opacity tracks per-word confidence; an amber underline marks anything below 0.93 —
+          the words a downstream consumer should refuse to act on without confirmation. Watch
+          &ldquo;bill of lading&rdquo; and the spoken account number, which are exactly where a
+          general-purpose model gets least certain.
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Voice activity &amp; endpointing</h2>
+        <div class="pad" id="vad"></div>
+      </div>
+      <div class="panel">
+        <h2>Per-frame latency distribution</h2>
+        <div class="pad" id="hist"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Wire frames <span class="h2spacer"></span><span class="count">newest first</span></h2>
+      <div class="pad" id="wire"></div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <p style="margin:0 0 9px"><strong>How it is built.</strong>
+      <code>vad.js</code> is real DSP and runs unchanged on live microphone input: frame RMS in dBFS,
+      an adaptive noise floor that only tracks while the gate is closed (otherwise steady speech
+      raises the floor and gates itself off mid-sentence), a hysteresis gate with separate onset and
+      hold thresholds, and a hangover timer for endpointing. <code>LatencyBudget</code> keeps a
+      rolling window and reports percentiles because a mean hides the tail that actually breaks a
+      voice agent. <code>FlowControl</code> models the high/low-water backpressure a socket needs when
+      a client uploads a file over a connection designed for live capture.</p>
+    <p style="margin:0">The canned session's word timings and confidences are authored so the demo is
+      deterministic and always available; the live mode does no transcription, it exercises the audio
+      pipeline. Frame timing, latency sampling, endpointing and flow control are the same code in both.</p>
+  </footer>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
